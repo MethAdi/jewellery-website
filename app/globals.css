@@ -138,8 +138,8 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 480px) {
   .heading-display {
-    font-size: clamp(2.8rem, 16vw, 4.2rem);
-    line-height: 1;
+    font-size: clamp(2.65rem, 13.5vw, 3.55rem);
+    line-height: 1.05;
   }
 
   .heading-section {
@@ -153,6 +153,12 @@ h1, h2, h3, h4, h5, h6 {
 
   .section-padding {
     padding: 64px 20px;
+  }
+}
+
+@media (max-width: 380px) {
+  .heading-display {
+    font-size: clamp(2.45rem, 12.5vw, 3.2rem);
   }
 }
 

@@ -7,7 +7,7 @@ import type { Variants } from "framer-motion";
 import { StaggerTestimonials } from "@/components/ui/stagger-testimonials";
 import { GlowingEffect } from "@/components/ui/glowing-effect";
 import { MasonryGallery } from "@/components/ui/masonry-gallery";
-import { ArrowUpRight, Scale, ShieldCheck, Mail, Phone, Plane, FileText } from "lucide-react";
+import { ArrowUpRight, Scale, ShieldCheck, Mail, Phone, Plane, FileText, Menu, X } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 
 // --- Framer Motion variants ---
@@ -77,6 +77,7 @@ export default function Home() {
   const [inquirySubmitted, setInquirySubmitted] = useState(false);
   const [inquirySubmitError, setInquirySubmitError] = useState("");
   const [isInquirySubmitting, setIsInquirySubmitting] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const yImageText = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
 
@@ -183,36 +184,65 @@ export default function Home() {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="fixed top-0 w-full z-50 bg-navy/95 backdrop-blur-md border-b border-white/5 px-4 sm:px-8 md:px-16 lg:px-24 py-4 sm:py-5"
+        className="fixed top-0 left-0 right-0 w-full max-w-full z-50 bg-transparent backdrop-blur-sm border-b border-white/10 px-0 md:px-16 lg:px-24 py-0 md:py-5"
       >
-        <div className="max-w-[1600px] mx-auto flex justify-between items-center">
+        <div className="max-w-[1600px] mx-auto flex justify-between items-center px-4 py-3 md:px-0 md:py-0">
           <Link href="/" className="flex items-center gap-3 sm:gap-6 group min-w-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center border border-gold-metallic/30 text-gold-leaf font-serif text-lg sm:text-xl tracking-widest transition-transform group-hover:scale-105">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center border border-navy/30 text-navy font-serif text-lg sm:text-xl tracking-widest transition-transform group-hover:scale-105">
               JP
             </div>
-            <div className="block min-w-0">
-              <div className="text-base sm:text-xl font-serif text-white tracking-widest leading-none mb-1 truncate">Jiten Parekh</div>
-              <div className="hidden sm:block text-[9px] uppercase tracking-[0.3em] text-gold-metallic/80 truncate">Govt. Approved Valuer</div>
+            <div className="block min-w-0 max-w-[58vw] sm:max-w-none">
+              <div className="text-base sm:text-xl font-serif text-navy tracking-widest leading-none mb-1 truncate">Jiten Parekh</div>
+              <div className="hidden sm:block text-[9px] uppercase tracking-[0.3em] text-navy/70 truncate">Govt. Approved Valuer</div>
             </div>
           </Link>
 
           <div className="hidden md:flex items-center gap-12">
-            <Link href="#about" className="text-xs font-semibold text-white/70 hover:text-gold-metallic transition-colors tracking-[0.2em] uppercase">About</Link>
-            <Link href="#services" className="text-xs font-semibold text-white/70 hover:text-gold-metallic transition-colors tracking-[0.2em] uppercase">Services</Link>
-            <Link href="#expertise" className="text-xs font-semibold text-white/70 hover:text-gold-metallic transition-colors tracking-[0.2em] uppercase">Expertise</Link>
+            <Link href="#about" className="text-xs font-semibold text-navy/75 hover:text-gold-metallic transition-colors tracking-[0.2em] uppercase">About</Link>
+            <Link href="#services" className="text-xs font-semibold text-navy/75 hover:text-gold-metallic transition-colors tracking-[0.2em] uppercase">Services</Link>
+            <Link href="#expertise" className="text-xs font-semibold text-navy/75 hover:text-gold-metallic transition-colors tracking-[0.2em] uppercase">Expertise</Link>
             <Link href="#contact" className="ml-4 text-xs font-bold text-navy bg-gold-leaf hover:bg-gold-metallic hover:text-white px-8 py-3 uppercase tracking-widest transition-all duration-300">
               Consultation
             </Link>
           </div>
-          <Link href="#contact" className="md:hidden text-[10px] font-bold text-navy bg-gold-leaf px-4 py-2 uppercase tracking-[0.14em] transition-colors">
-            Consult
-          </Link>
+          <button
+            type="button"
+            className="md:hidden flex h-10 w-10 shrink-0 items-center justify-center border border-navy/20 text-navy"
+            onClick={() => setIsMobileNavOpen((open) => !open)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={isMobileNavOpen}
+          >
+            {isMobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
+        {isMobileNavOpen && (
+          <div className="md:hidden border-t border-white/10 bg-navy/95 backdrop-blur-md px-4 py-4 shadow-2xl">
+            <div className="grid gap-3">
+              {[
+                ["About", "#about"],
+                ["Services", "#services"],
+                ["Expertise", "#expertise"],
+                ["Gallery", "#gallery"],
+                ["Contact", "#contact"],
+              ].map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="border border-white/10 px-4 py-3 text-sm font-semibold text-white/80 hover:border-gold-metallic/50 hover:text-gold-metallic transition-colors tracking-[0.16em] uppercase"
+                  onClick={() => setIsMobileNavOpen(false)}
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </motion.nav>
+      <div className="h-[76px] md:hidden" aria-hidden="true" />
 
       {/* ═══ HERO SECTION ═══ */}
-      <section ref={heroRef} className="relative min-h-[100svh] flex items-center pt-28 pb-16 lg:py-0 overflow-hidden bg-paper-white">
-        <div className="container-wide w-full px-5 sm:px-8 md:px-16 lg:px-24">
+      <section ref={heroRef} className="relative min-h-[calc(100svh-76px)] flex items-start lg:items-center pt-8 sm:pt-10 md:pt-28 pb-16 lg:py-0 overflow-hidden bg-paper-white">
+        <div className="container-wide w-full px-6 sm:px-8 md:px-16 lg:px-24">
           <div className="grid lg:grid-cols-12 gap-10 md:gap-14 lg:gap-8 items-center h-full">
             
             {/* Left Content */}
@@ -228,7 +258,7 @@ export default function Home() {
                 <span className="subheading text-slate">Established 1989</span>
               </motion.div>
 
-              <motion.h1 custom={1} variants={fadeInUp} className="heading-display text-navy mb-8">
+              <motion.h1 custom={1} variants={fadeInUp} className="heading-display text-navy mb-6 sm:mb-8">
                 Precision in <br />
                 <span className="text-gold-metallic italic font-light tracking-tight pr-4">Every Facet</span>
               </motion.h1>
@@ -247,7 +277,7 @@ export default function Home() {
               </motion.div>
 
               {/* Stats */}
-              <motion.div custom={4} variants={fadeInUp} className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 border-t border-navy/10 pt-7 sm:pt-10">
+              <motion.div custom={4} variants={fadeInUp} className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 border-t border-navy/10 pt-7 sm:pt-10 px-1 sm:px-0">
                 <div className="min-w-0">
                   <div className="text-3xl sm:text-4xl lg:text-5xl font-serif text-navy mb-1 sm:mb-2">39<span className="text-gold-metallic">+</span></div>
                   <div className="subheading text-slate text-xs sm:text-sm">Years Exp.</div>
@@ -580,13 +610,13 @@ export default function Home() {
       </section>
 
       {/* ═══ FOOTER ═══ */}
-      <footer className="bg-[#0A0D14] text-white border-t border-white/5 px-8 md:px-16 lg:px-24 py-5">
-        <div className="container-wide mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
-          <div className="flex items-center gap-4">
-            <div className="text-gold-metallic text-xl font-serif tracking-widest">Jiten Parekh</div>
+      <footer className="w-full max-w-full overflow-hidden bg-[#0A0D14] text-white border-t border-white/5 px-4 sm:px-8 md:px-16 lg:px-24 py-5">
+        <div className="container-wide max-w-full mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="text-gold-metallic text-lg sm:text-xl font-serif tracking-widest truncate">Jiten Parekh</div>
             <div className="hidden sm:block text-[9px] uppercase tracking-[0.25em] text-[#666]">Est. 1998</div>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-[#666] text-[9px] uppercase tracking-[0.15em]">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-8 text-[#666] text-[9px] uppercase tracking-[0.12em] sm:tracking-[0.15em] max-w-full">
             <div>&copy; {new Date().getFullYear()} Jiten Parekh.</div>
             <a 
               href="#" 
