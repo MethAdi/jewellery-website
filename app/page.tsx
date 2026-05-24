@@ -3,14 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
+import type { Variants } from "framer-motion";
 import { StaggerTestimonials } from "@/components/ui/stagger-testimonials";
 import { GlowingEffect } from "@/components/ui/glowing-effect";
 import { MasonryGallery } from "@/components/ui/masonry-gallery";
-import { ArrowUpRight, Diamond, Scale, ShieldCheck, Mail, Phone, Plane, FileText } from "lucide-react";
-import { useRef } from "react";
+import { ArrowUpRight, Scale, ShieldCheck, Mail, Phone, Plane, FileText } from "lucide-react";
+import { FormEvent, useRef, useState } from "react";
 
 // --- Framer Motion variants ---
-const fadeInUp: any = {
+const smoothEase = [0.25, 1, 0.5, 1] as const;
+
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 50 },
   visible: (i: number = 0) => ({
     opacity: 1,
@@ -18,12 +21,12 @@ const fadeInUp: any = {
     transition: {
       delay: i * 0.15,
       duration: 0.8,
-      ease: [0.25, 1, 0.5, 1] // Elegant ease out
+      ease: smoothEase // Elegant ease out
     }
   })
 };
 
-const staggerContainer: any = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -31,11 +34,11 @@ const staggerContainer: any = {
   }
 };
 
-const lineReveal: any = {
+const lineReveal: Variants = {
   hidden: { scaleX: 0 },
   visible: {
     scaleX: 1,
-    transition: { duration: 1, ease: [0.25, 1, 0.5, 1] }
+    transition: { duration: 1, ease: smoothEase }
   }
 };
 
@@ -61,10 +64,116 @@ const marqueeImages = [
   "/jewellery/image.png"
 ];
 
+type InquiryErrors = Partial<Record<"name" | "phone" | "email" | "nature" | "message", string>>;
+const emailPattern =
+  /^[A-Z0-9._%+-]+@(?:[A-Z0-9-]+\.)+(?:COM|IN|NET|ORG|CO|IO|AI|BIZ|INFO|EDU|GOV|DEV)$/i;
+const web3FormsAccessKey =
+  process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY ??
+  "7fee0aa5-a85a-40b6-877c-ba548db66b68";
+
 export default function Home() {
   const heroRef = useRef(null);
+  const [inquiryErrors, setInquiryErrors] = useState<InquiryErrors>({});
+  const [inquirySubmitted, setInquirySubmitted] = useState(false);
+  const [inquirySubmitError, setInquirySubmitError] = useState("");
+  const [isInquirySubmitting, setIsInquirySubmitting] = useState(false);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const yImageText = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+
+  const getInquiryErrorClass = (field: keyof InquiryErrors) =>
+    inquiryErrors[field] ? "border-b-red-600" : "";
+
+  const handleInquirySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const name = String(formData.get("name") ?? "").trim();
+    const phone = String(formData.get("phone") ?? "").trim();
+    const phoneDigits = phone.replace(/\D/g, "");
+    const normalizedPhone =
+      phoneDigits.length === 12 && phoneDigits.startsWith("91")
+        ? phoneDigits.slice(2)
+        : phoneDigits;
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const nature = String(formData.get("nature") ?? "").trim();
+    const message = String(formData.get("message") ?? "").trim();
+    const nextErrors: InquiryErrors = {};
+
+    if (!name) {
+      nextErrors.name = "Please enter your full name.";
+    }
+
+    if (!phone) {
+      nextErrors.phone = "Please enter your phone number.";
+    } else if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+      nextErrors.phone = "Please enter a valid 10-digit Indian mobile number.";
+    }
+
+    if (!email) {
+      nextErrors.email = "Please enter your email address.";
+    } else if (!emailPattern.test(email)) {
+      nextErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!nature) {
+      nextErrors.nature = "Please select the nature of valuation.";
+    }
+
+    if (!message) {
+      nextErrors.message = "Please add brief details about your items.";
+    } else if (message.length < 10) {
+      nextErrors.message = "Please add at least 10 characters of detail.";
+    }
+
+    setInquiryErrors(nextErrors);
+    setInquirySubmitted(false);
+    setInquirySubmitError("");
+
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    setIsInquirySubmitting(true);
+
+    try {
+      if (!web3FormsAccessKey) {
+        throw new Error("Missing Web3Forms access key.");
+      }
+
+      const submissionData = new FormData();
+      submissionData.append("access_key", web3FormsAccessKey);
+      submissionData.append("subject", "New Jewellery Valuation Inquiry");
+      submissionData.append("from_name", name);
+      submissionData.append("name", name);
+      submissionData.append("phone", normalizedPhone);
+      submissionData.append("email", email);
+      submissionData.append("nature", nature);
+      submissionData.append("message", message);
+
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        body: submissionData,
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Unable to submit inquiry.");
+      }
+
+      form.reset();
+      setInquirySubmitted(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not send your inquiry. Please try again or contact us directly.";
+
+      setInquirySubmitError(message);
+    } finally {
+      setIsInquirySubmitting(false);
+    }
+  };
   
   return (
     <div className="min-h-screen bg-paper-white relative">
@@ -74,16 +183,16 @@ export default function Home() {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="fixed top-0 w-full z-50 bg-navy/95 backdrop-blur-md border-b border-white/5 px-8 md:px-16 lg:px-24 py-5"
+        className="fixed top-0 w-full z-50 bg-navy/95 backdrop-blur-md border-b border-white/5 px-4 sm:px-8 md:px-16 lg:px-24 py-4 sm:py-5"
       >
         <div className="max-w-[1600px] mx-auto flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-6 group">
-            <div className="w-12 h-12 flex items-center justify-center border border-gold-metallic/30 text-gold-leaf font-serif text-xl tracking-widest transition-transform group-hover:scale-105">
+          <Link href="/" className="flex items-center gap-3 sm:gap-6 group min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 flex shrink-0 items-center justify-center border border-gold-metallic/30 text-gold-leaf font-serif text-lg sm:text-xl tracking-widest transition-transform group-hover:scale-105">
               JP
             </div>
-            <div className="hidden sm:block">
-              <div className="text-xl font-serif text-white tracking-widest leading-none mb-1">Jiten Parekh</div>
-              <div className="text-[9px] uppercase tracking-[0.3em] text-gold-metallic/80">Govt. Approved Valuer</div>
+            <div className="block min-w-0">
+              <div className="text-base sm:text-xl font-serif text-white tracking-widest leading-none mb-1 truncate">Jiten Parekh</div>
+              <div className="hidden sm:block text-[9px] uppercase tracking-[0.3em] text-gold-metallic/80 truncate">Govt. Approved Valuer</div>
             </div>
           </Link>
 
@@ -95,13 +204,16 @@ export default function Home() {
               Consultation
             </Link>
           </div>
+          <Link href="#contact" className="md:hidden text-[10px] font-bold text-navy bg-gold-leaf px-4 py-2 uppercase tracking-[0.14em] transition-colors">
+            Consult
+          </Link>
         </div>
       </motion.nav>
 
       {/* ═══ HERO SECTION ═══ */}
-      <section ref={heroRef} className="relative min-h-[100svh] flex items-center pt-32 lg:pt-0 overflow-hidden bg-paper-white">
-        <div className="container-wide w-full px-5 md:px-16 lg:px-24">
-          <div className="grid lg:grid-cols-12 gap-16 lg:gap-8 items-center h-full">
+      <section ref={heroRef} className="relative min-h-[100svh] flex items-center pt-28 pb-16 lg:py-0 overflow-hidden bg-paper-white">
+        <div className="container-wide w-full px-5 sm:px-8 md:px-16 lg:px-24">
+          <div className="grid lg:grid-cols-12 gap-10 md:gap-14 lg:gap-8 items-center h-full">
             
             {/* Left Content */}
             <motion.div 
@@ -111,8 +223,8 @@ export default function Home() {
               variants={staggerContainer}
             >
               <div className="w-full max-w-2xl lg:pr-12 xl:pr-20">
-              <motion.div custom={0} variants={fadeInUp} className="flex items-center gap-4 mb-10">
-                <span className="w-12 h-[1px] bg-gold-metallic"></span>
+              <motion.div custom={0} variants={fadeInUp} className="flex items-center gap-4 mb-7 sm:mb-10">
+                <span className="w-8 sm:w-12 h-[1px] bg-gold-metallic"></span>
                 <span className="subheading text-slate">Established 1989</span>
               </motion.div>
 
@@ -121,11 +233,11 @@ export default function Home() {
                 <span className="text-gold-metallic italic font-light tracking-tight pr-4">Every Facet</span>
               </motion.h1>
 
-              <motion.p custom={2} variants={fadeInUp} className="text-xl text-slate mb-12 max-w-lg leading-relaxed font-light">
+              <motion.p custom={2} variants={fadeInUp} className="text-base sm:text-lg lg:text-xl text-slate mb-9 sm:mb-12 max-w-lg leading-relaxed font-light">
                 India’s premier Govt. Approved Valuer & GII Gemologist. Delivering undisputed trust and certified excellence for over 39 years.
               </motion.p>
 
-              <motion.div custom={3} variants={fadeInUp} className="flex flex-col sm:flex-row gap-6 mb-20">
+              <motion.div custom={3} variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-12 sm:mb-16 lg:mb-20">
                 <Link href="#services" className="btn-primary">
                   <span>Explore Services</span>
                 </Link>
@@ -135,17 +247,17 @@ export default function Home() {
               </motion.div>
 
               {/* Stats */}
-              <motion.div custom={4} variants={fadeInUp} className="flex flex-wrap sm:grid sm:grid-cols-3 gap-8 sm:gap-6 lg:gap-8 border-t border-navy/10 pt-10">
-                <div className="w-[45%] sm:w-auto">
-                  <div className="text-4xl lg:text-5xl font-serif text-navy mb-2">39<span className="text-gold-metallic">+</span></div>
+              <motion.div custom={4} variants={fadeInUp} className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 border-t border-navy/10 pt-7 sm:pt-10">
+                <div className="min-w-0">
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-serif text-navy mb-1 sm:mb-2">39<span className="text-gold-metallic">+</span></div>
                   <div className="subheading text-slate text-xs sm:text-sm">Years Exp.</div>
                 </div>
-                <div className="w-[45%] sm:w-auto">
-                  <div className="text-4xl lg:text-5xl font-serif text-navy mb-2">GII</div>
+                <div className="min-w-0">
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-serif text-navy mb-1 sm:mb-2">GII</div>
                   <div className="subheading text-slate text-xs sm:text-sm">Certified</div>
                 </div>
-                <div className="w-[45%] sm:w-auto">
-                  <div className="text-4xl lg:text-5xl font-serif text-navy mb-2">Govt</div>
+                <div className="min-w-0">
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-serif text-navy mb-1 sm:mb-2">Govt</div>
                   <div className="subheading text-slate text-xs sm:text-sm">Approved</div>
                 </div>
               </motion.div>
@@ -154,17 +266,19 @@ export default function Home() {
 
           {/* Right Image */}
             <motion.div 
-              className="lg:col-span-6 h-[50vh] md:h-[60vh] lg:h-[85vh] relative image-reveal-wrapper w-full mt-12 lg:mt-0"
+              className="lg:col-span-6 h-[360px] sm:h-[460px] md:h-[60vh] lg:h-[85vh] relative image-reveal-wrapper w-full mt-2 lg:mt-0 group hover:shadow-[0_30px_90px_rgba(212,175,55,0.24)] transition-shadow duration-700"
               initial={{ opacity: 0, clipPath: 'inset(100% 0 0 0)' }}
               animate={{ opacity: 1, clipPath: 'inset(0% 0 0 0)' }}
               transition={{ duration: 1.5, ease: [0.25, 1, 0.5, 1] }}
             >
+              <div className="absolute inset-0 z-10 border border-transparent group-hover:border-gold-metallic/60 transition-colors duration-700 pointer-events-none"></div>
+              <div className="absolute inset-0 z-10 bg-gradient-to-tr from-gold-metallic/0 via-white/0 to-gold-leaf/0 group-hover:from-gold-metallic/10 group-hover:via-white/5 group-hover:to-gold-leaf/20 transition-colors duration-700 pointer-events-none"></div>
               <motion.div style={{ y: yImageText }} className="absolute inset-0 w-full h-[120%] -top-[10%]">
                 <Image
                   src="/hero-bg.png"
                   alt="High-end jewelry"
                   fill
-                  className="object-cover grayscale hover:grayscale-0 transition-all duration-[2000ms]"
+                  className="object-cover transition-all duration-[1400ms] ease-out group-hover:scale-110 group-hover:brightness-110 group-hover:saturate-125"
                   priority
                 />
               </motion.div>
@@ -175,24 +289,26 @@ export default function Home() {
 
       {/* ═══ ABOUT / LEGACY ═══ */}
       <section id="about" className="section-padding bg-alabaster">
-        <div className="container-wide px-5 md:px-16 lg:px-24">
+        <div className="container-wide px-5 sm:px-8 md:px-16 lg:px-24">
           <motion.div 
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={staggerContainer}
-            className="grid lg:grid-cols-2 gap-20 items-center"
+            className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
           >
             {/* Image Block */}
-            <motion.div variants={fadeInUp} className="relative aspect-[4/5] w-full max-w-lg mx-auto lg:mx-0">
-               <div className="absolute inset-0 bg-navy -translate-x-6 translate-y-6"></div>
-               <div className="relative w-full h-full border border-navy/20 bg-white p-4">
+            <motion.div variants={fadeInUp} className="relative aspect-[4/5] w-full max-w-sm sm:max-w-md lg:max-w-lg mx-auto lg:mx-0">
+               <div className="absolute inset-0 bg-navy -translate-x-3 sm:-translate-x-6 translate-y-3 sm:translate-y-6"></div>
+               <div className="relative w-full h-full border border-navy/20 bg-white p-4 group hover:border-gold-metallic/70 hover:shadow-[0_30px_80px_rgba(11,25,44,0.18)] transition-all duration-700">
                   <div className="relative w-full h-full overflow-hidden">
+                    <div className="absolute inset-0 z-10 border border-transparent group-hover:border-gold-metallic/50 transition-colors duration-700 pointer-events-none"></div>
+                    <div className="absolute inset-0 z-10 bg-gradient-to-tr from-navy/0 via-white/0 to-gold-leaf/0 group-hover:from-navy/10 group-hover:via-white/5 group-hover:to-gold-leaf/20 transition-colors duration-700 pointer-events-none"></div>
                     <Image
                       src="/valuation.png"
                       alt="Jiten Parekh valuating jewelry"
                       fill
-                      className="object-cover grayscale hover:grayscale-0 transition-all duration-1000"
+                      className="object-cover transition-all duration-[1400ms] ease-out group-hover:scale-110 group-hover:brightness-110 group-hover:saturate-125"
                     />
                   </div>
                </div>
@@ -200,14 +316,14 @@ export default function Home() {
 
             {/* Text Block */}
             <motion.div className="flex flex-col justify-center">
-              <motion.div variants={lineReveal} className="h-[1px] w-24 bg-gold-metallic origin-left mb-10"></motion.div>
+              <motion.div variants={lineReveal} className="h-[1px] w-20 sm:w-24 bg-gold-metallic origin-left mb-7 sm:mb-10"></motion.div>
               
-              <motion.h2 variants={fadeInUp} className="heading-section text-navy mb-12">
+              <motion.h2 variants={fadeInUp} className="heading-section text-navy mb-8 sm:mb-12">
                 A Legacy of Trust, <br />
                 <span className="italic text-gold-metallic font-light">Crafted in Precision.</span>
               </motion.h2>
               
-              <motion.div variants={fadeInUp} className="space-y-8 text-xl text-slate font-light leading-relaxed max-w-2xl">
+              <motion.div variants={fadeInUp} className="space-y-6 sm:space-y-8 text-base sm:text-lg lg:text-xl text-slate font-light leading-relaxed max-w-2xl">
                 <p>
                   <strong className="text-navy font-semibold">Mr. Jiten Parekh</strong> is an authoritative voice in gemology, holding premier certification from the <strong className="text-navy font-semibold">Gemological Institute of India (GII)</strong>.
                 </p>
@@ -216,7 +332,7 @@ export default function Home() {
                 </p>
               </motion.div>
 
-              <motion.div variants={fadeInUp} className="mt-16">
+              <motion.div variants={fadeInUp} className="mt-10 sm:mt-16">
                  <Link href="#contact" className="group inline-flex items-center gap-4 border-b border-navy pb-3 hover:border-gold-metallic transition-colors">
                     <span className="subheading text-navy group-hover:text-gold-metallic transition-colors">Book a private consultation</span>
                     <ArrowUpRight className="w-5 h-5 text-navy group-hover:text-gold-metallic transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
@@ -229,17 +345,17 @@ export default function Home() {
 
       {/* ═══ SERVICES ═══ */}
       <section id="services" className="section-padding bg-paper-white border-y border-navy/5">
-        <div className="container-wide px-5 md:px-16 lg:px-24">
+        <div className="container-wide px-5 sm:px-8 md:px-16 lg:px-24">
           <motion.div 
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={staggerContainer}
-            className="flex flex-col lg:flex-row justify-between items-end gap-10 mb-24"
+            className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 lg:gap-10 mb-14 sm:mb-20 lg:mb-24"
           >
             <div className="max-w-3xl">
-              <motion.div variants={fadeInUp} className="flex items-center gap-4 mb-8">
-                <span className="w-12 h-[1px] bg-gold-metallic"></span>
+              <motion.div variants={fadeInUp} className="flex items-center gap-4 mb-6 sm:mb-8">
+                <span className="w-8 sm:w-12 h-[1px] bg-gold-metallic"></span>
                 <span className="subheading text-slate">Valuation Expertise</span>
               </motion.div>
               <motion.h2 variants={fadeInUp} className="heading-section text-navy">
@@ -247,7 +363,7 @@ export default function Home() {
               </motion.h2>
             </div>
             
-            <motion.p variants={fadeInUp} className="text-slate text-lg font-light max-w-md">
+            <motion.p variants={fadeInUp} className="text-slate text-base sm:text-lg font-light max-w-md">
               Meticulous, legally-binding valuation documentation tailored to your specific regulatory requirements.
             </motion.p>
           </motion.div>
@@ -257,7 +373,7 @@ export default function Home() {
              whileInView="visible"
              viewport={{ once: true, margin: "-100px" }}
              variants={staggerContainer}
-             className="grid md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
+             className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 lg:gap-x-8 gap-y-8 sm:gap-y-12 lg:gap-y-16"
           >
             {[
               {
@@ -282,7 +398,7 @@ export default function Home() {
               }
             ].map((service, i) => (
               <motion.div key={i} variants={fadeInUp} className="relative w-full">
-                <div className="relative h-full rounded-2xl border border-navy/5 bg-white p-8 group flex flex-col items-center lg:items-start text-center lg:text-left shadow-sm hover:shadow-xl transition-shadow duration-500 min-h-[16rem]">
+                <div className="relative h-full rounded-2xl border border-navy/5 bg-white p-6 sm:p-8 group flex flex-col items-center lg:items-start text-center lg:text-left shadow-sm hover:shadow-xl transition-shadow duration-500 min-h-[14rem] sm:min-h-[16rem]">
                   <GlowingEffect
                     spread={40}
                     glow={true}
@@ -315,16 +431,16 @@ export default function Home() {
 
       {/* ═══ TESTIMONIALS (Integrated with original component logic) ═══ */}
       <section className="bg-alabaster overflow-hidden">
-        <div className="py-24 max-w-[1600px] mx-auto text-center px-4">
+        <div className="py-16 sm:py-20 lg:py-24 max-w-[1600px] mx-auto text-center px-4">
            <div className="flex items-center justify-center gap-4 mb-8">
               <span className="w-8 h-[1px] bg-gold-metallic"></span>
               <span className="subheading text-slate">Client Reputation</span>
               <span className="w-8 h-[1px] bg-gold-metallic"></span>
             </div>
-            <h2 className="heading-section text-navy mb-16">
+            <h2 className="heading-section text-navy mb-10 sm:mb-16">
               A Legacy of <span className="italic text-gold-metallic font-light">Trust</span>
             </h2>
-            <div className="scale-90 md:scale-100 origin-top">
+            <div className="scale-[0.78] sm:scale-90 md:scale-100 origin-top -mx-8 sm:mx-0">
               <StaggerTestimonials />
             </div>
         </div>
@@ -332,62 +448,94 @@ export default function Home() {
 
       {/* ═══ CONTACT ═══ */}
       <section id="contact" className="section-padding bg-paper-white relative">
-        <div className="container-wide px-5 md:px-16 lg:px-24">
-          <div className="grid lg:grid-cols-12 gap-24">
+        <div className="container-wide px-5 sm:px-8 md:px-16 lg:px-24">
+          <div className="grid lg:grid-cols-12 gap-12 lg:gap-24">
             
             {/* Contact Info */}
             <div className="lg:col-span-5 flex flex-col justify-center">
-              <div className="flex items-center gap-4 mb-8">
-                <span className="w-12 h-[1px] bg-gold-metallic"></span>
+              <div className="flex items-center gap-4 mb-6 sm:mb-8">
+                <span className="w-8 sm:w-12 h-[1px] bg-gold-metallic"></span>
                 <span className="subheading text-slate">Inquiries</span>
               </div>
-              <h2 className="heading-section text-navy mb-12">
+              <h2 className="heading-section text-navy mb-8 sm:mb-12">
                 Request an <br />
                 <span className="italic text-gold-metallic font-light">Evaluation.</span>
               </h2>
-              <p className="text-xl text-slate font-light mb-16">
+              <p className="text-base sm:text-lg lg:text-xl text-slate font-light mb-10 sm:mb-16">
                 Consult with Mr. Parekh directly regarding your extensive portfolios, antique collections, or specific certification needs.
               </p>
 
-              <div className="space-y-12">
-                <div className="group flex items-center gap-8 cursor-pointer">
-                   <div className="w-16 h-16 border border-navy flex items-center justify-center rounded-full group-hover:bg-navy transition-colors">
+              <div className="space-y-8 sm:space-y-12">
+                <div className="group flex items-center gap-4 sm:gap-8 cursor-pointer min-w-0">
+                   <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 border border-navy flex items-center justify-center rounded-full group-hover:bg-navy transition-colors">
                      <Phone className="w-6 h-6 text-navy group-hover:text-gold-leaf transition-colors" strokeWidth={1} />
                    </div>
                    <div>
                      <div className="subheading text-slate mb-2">Direct Line</div>
-                     <div className="text-2xl font-serif text-navy group-hover:text-gold-metallic transition-colors">+91 93222 21692</div>
+                     <div className="text-xl sm:text-2xl font-serif text-navy group-hover:text-gold-metallic transition-colors">+91 93222 21692</div>
                    </div>
                 </div>
 
-                <div className="group flex items-center gap-8 cursor-pointer">
-                   <div className="w-16 h-16 border border-navy flex items-center justify-center rounded-full group-hover:bg-navy transition-colors">
+                <div className="group flex items-center gap-4 sm:gap-8 cursor-pointer min-w-0">
+                   <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 border border-navy flex items-center justify-center rounded-full group-hover:bg-navy transition-colors">
                      <Mail className="w-6 h-6 text-navy group-hover:text-gold-leaf transition-colors" strokeWidth={1} />
                    </div>
                    <div>
                      <div className="subheading text-slate mb-2">Private Email</div>
-                     <div className="text-2xl font-serif text-navy group-hover:text-gold-metallic transition-colors">parekhjiten@hotmail.com</div>
+                     <div className="text-lg sm:text-2xl font-serif text-navy group-hover:text-gold-metallic transition-colors break-all">parekhjiten@hotmail.com</div>
                    </div>
                 </div>
               </div>
             </div>
 
             {/* Premium Form */}
-            <div className="lg:col-span-7 bg-alabaster p-10 md:p-20 border border-navy/5 relative">
-              <div className="absolute top-0 right-0 w-32 h-32 border-t border-r border-gold-metallic/30"></div>
-              <div className="absolute bottom-0 left-0 w-32 h-32 border-b border-l border-gold-metallic/30"></div>
+            <div className="lg:col-span-7 bg-alabaster p-6 sm:p-10 md:p-20 border border-navy/5 relative">
+              <div className="absolute top-0 right-0 w-20 h-20 sm:w-32 sm:h-32 border-t border-r border-gold-metallic/30"></div>
+              <div className="absolute bottom-0 left-0 w-20 h-20 sm:w-32 sm:h-32 border-b border-l border-gold-metallic/30"></div>
 
-              <h3 className="text-3xl font-serif text-navy mb-12 relative z-10">Confidential Inquiry</h3>
+              <h3 className="text-2xl sm:text-3xl font-serif text-navy mb-8 sm:mb-12 relative z-10">Confidential Inquiry</h3>
               
-              <form className="space-y-12 relative z-10">
-                <div className="grid md:grid-cols-2 gap-12">
-                  <input type="text" placeholder="Full Name" className="input-editorial" />
-                  <input type="tel" placeholder="Phone Number" className="input-editorial" />
+              <form className="space-y-8 sm:space-y-12 relative z-10" onSubmit={handleInquirySubmit} noValidate>
+                <div className="grid md:grid-cols-2 gap-8 sm:gap-12">
+                  <div>
+                    <input
+                      type="text"
+                      name="name"
+                      placeholder="Full Name"
+                      className={`input-editorial ${getInquiryErrorClass("name")}`}
+                      aria-invalid={Boolean(inquiryErrors.name)}
+                    />
+                    {inquiryErrors.name && <p className="mt-2 text-sm text-red-600">{inquiryErrors.name}</p>}
+                  </div>
+                  <div>
+                    <input
+                      type="tel"
+                      name="phone"
+                      placeholder="Phone Number"
+                      className={`input-editorial ${getInquiryErrorClass("phone")}`}
+                      aria-invalid={Boolean(inquiryErrors.phone)}
+                    />
+                    {inquiryErrors.phone && <p className="mt-2 text-sm text-red-600">{inquiryErrors.phone}</p>}
+                  </div>
                 </div>
-                <input type="email" placeholder="Email Address" className="input-editorial" />
+                <div>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Email Address"
+                    className={`input-editorial ${getInquiryErrorClass("email")}`}
+                    aria-invalid={Boolean(inquiryErrors.email)}
+                  />
+                  {inquiryErrors.email && <p className="mt-2 text-sm text-red-600">{inquiryErrors.email}</p>}
+                </div>
                 
                 <div className="relative">
-                  <select className="input-editorial text-slate appearance-none bg-transparent" defaultValue="">
+                  <select
+                    name="nature"
+                    className={`input-editorial text-slate appearance-none bg-transparent ${getInquiryErrorClass("nature")}`}
+                    defaultValue=""
+                    aria-invalid={Boolean(inquiryErrors.nature)}
+                  >
                     <option value="" disabled>Nature of Valuation</option>
                     <option>Taxation & Capital Gains</option>
                     <option>Insurance or Bank Loan</option>
@@ -395,12 +543,34 @@ export default function Home() {
                     <option>Visa & Global Customs</option>
                     <option>Other Private Matter</option>
                   </select>
+                  {inquiryErrors.nature && <p className="mt-2 text-sm text-red-600">{inquiryErrors.nature}</p>}
                 </div>
                 
-                <textarea rows={3} placeholder="Brief details about your items..." className="input-editorial resize-none"></textarea>
+                <div>
+                  <textarea
+                    rows={3}
+                    name="message"
+                    placeholder="Brief details about your items..."
+                    className={`input-editorial resize-none ${getInquiryErrorClass("message")}`}
+                    aria-invalid={Boolean(inquiryErrors.message)}
+                  ></textarea>
+                  {inquiryErrors.message && <p className="mt-2 text-sm text-red-600">{inquiryErrors.message}</p>}
+                </div>
                 
-                <button type="button" className="btn-primary w-full mt-8">
-                  <span>Submit Inquiry</span>
+                {inquirySubmitted && (
+                  <p className="text-sm text-green-700">
+                    Thank you. Your inquiry has been sent.
+                  </p>
+                )}
+
+                {inquirySubmitError && (
+                  <p className="text-sm text-red-600">
+                    {inquirySubmitError}
+                  </p>
+                )}
+
+                <button type="submit" className="btn-primary w-full mt-8" disabled={isInquirySubmitting}>
+                  <span>{isInquirySubmitting ? "Sending..." : "Submit Inquiry"}</span>
                 </button>
               </form>
             </div>
@@ -410,48 +580,25 @@ export default function Home() {
       </section>
 
       {/* ═══ FOOTER ═══ */}
-      <footer className="bg-[#0A0D14] text-white pt-12 pb-6 border-t border-white/5 relative overflow-hidden">
-        {/* Decorative corner accent */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gold-metallic/5 blur-[100px] rounded-full pointer-events-none"></div>
-
-        <div className="container-wide px-5 md:px-16 lg:px-24 mx-auto relative z-10">
-           
-           <div className="flex flex-col items-center justify-center mb-12">
-             
-             {/* Brand & Legacy */}
-             <div className="flex flex-col items-center justify-center text-center">
-               <div className="text-gold-metallic text-3xl sm:text-4xl font-serif mb-4 sm:mb-6 tracking-widest">Jiten Parekh</div>
-               <div className="text-[9px] uppercase tracking-[0.1em] sm:tracking-[0.3em] text-[#666] flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
-                 <span className="w-4 sm:w-8 h-[1px] bg-[#666]"></span>
-                 Est. 1998
-                 <span className="w-4 sm:w-8 h-[1px] bg-[#666]"></span>
-               </div>
-             </div>
-             
-           </div>
-
-           {/* Premium Divider */}
-           <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6"></div>
-
-           {/* Copyright Bar */}
-           <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-[#666] text-[9px] uppercase tracking-[0.1em] sm:tracking-[0.2em] text-center md:text-left">
-             <div className="max-w-[200px] md:max-w-none leading-relaxed md:leading-normal">
-               &copy; {new Date().getFullYear()} Jiten Parekh. A Legacy of Precision.
-             </div>
-             <div className="flex gap-8">
-               <a 
-                  href="#" 
-                  className="hover:text-gold-metallic transition-colors flex items-center gap-2"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                >
-                 Back to Top <ArrowUpRight className="w-3 h-3" />
-               </a>
-             </div>
-           </div>
-           
+      <footer className="bg-[#0A0D14] text-white border-t border-white/5 px-8 md:px-16 lg:px-24 py-5">
+        <div className="container-wide mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+          <div className="flex items-center gap-4">
+            <div className="text-gold-metallic text-xl font-serif tracking-widest">Jiten Parekh</div>
+            <div className="hidden sm:block text-[9px] uppercase tracking-[0.25em] text-[#666]">Est. 1998</div>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-[#666] text-[9px] uppercase tracking-[0.15em]">
+            <div>&copy; {new Date().getFullYear()} Jiten Parekh.</div>
+            <a 
+              href="#" 
+              className="hover:text-gold-metallic transition-colors flex items-center gap-2"
+              onClick={(e) => {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            >
+              Back to Top <ArrowUpRight className="w-3 h-3" />
+            </a>
+          </div>
         </div>
       </footer>
 

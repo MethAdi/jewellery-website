@@ -13,7 +13,6 @@ export const MasonryGallery = ({ images }: { images: string[] }) => {
   return (
     <section id="gallery" className="section-padding bg-paper-white relative">
       <div className="container-wide px-5 md:px-16 lg:px-24">
-        
         {/* Header */}
         <div className="flex flex-col items-center justify-center mb-20 text-center">
           <div className="flex items-center gap-4 mb-6">
@@ -22,7 +21,10 @@ export const MasonryGallery = ({ images }: { images: string[] }) => {
             <span className="w-12 h-[1px] bg-gold-metallic"></span>
           </div>
           <h2 className="heading-section text-navy">
-            Valuated <span className="italic text-gold-metallic font-light">Masterpieces</span>
+            Valuated{" "}
+            <span className="italic text-gold-metallic font-light">
+              Masterpieces
+            </span>
           </h2>
         </div>
 
@@ -34,21 +36,24 @@ export const MasonryGallery = ({ images }: { images: string[] }) => {
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.8, delay: (idx % 6) * 0.1, ease: [0.25, 1, 0.5, 1] }}
-              className={`relative break-inside-avoid w-full ${getContainerHeight(idx)} rounded overflow-hidden group border border-navy/5 shadow-sm hover:shadow-xl transition-all duration-700`}
+              transition={{
+                duration: 0.8,
+                delay: (idx % 6) * 0.1,
+                ease: [0.25, 1, 0.5, 1],
+              }}
+              className={`relative break-inside-avoid w-full ${getContainerHeight(idx)} rounded overflow-hidden group border border-navy/5 shadow-sm hover:shadow-2xl hover:-translate-y-2 hover:z-10 transition-all duration-[800ms] ease-out hover:ring-1 hover:ring-gold-metallic/30`}
             >
               <Image
                 src={src}
                 alt={`Valuated Collection Piece ${idx + 1}`}
                 fill
                 quality={85}
-                className="object-cover object-center grayscale group-hover:grayscale-0 transition-all duration-700 group-hover:scale-105 inline-block"
+                className="object-cover object-center transition-all duration-[800ms] ease-out group-hover:scale-110 group-hover:-rotate-1 group-hover:brightness-105 inline-block"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
             </motion.div>
           ))}
         </div>
-        
       </div>
     </section>
   );
